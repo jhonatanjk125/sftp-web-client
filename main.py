@@ -2,7 +2,7 @@ import os
 from zipstream import ZipFile as ZipStream, ZIP_DEFLATED
 from typing import List
 from colorama import Back
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Body
 from paramiko import SSHClient, AutoAddPolicy, SFTPClient
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -205,7 +205,10 @@ def list_remote_dir(
     
 
 
-@app.get("/files/meta/", response_model=List[FileInfo], summary="Get metadata for a directory")
+@app.get("/files/meta/", 
+         response_model=List[FileInfo], 
+         summary="List files and directories with metadata",
+         description="Returns name, size, modification time, and type (file or directory) for each entry in the given path.")
 def list_with_meta(
     path: str = Query(".", description="Remote directory path"),
     sftp: SFTPClient = Depends(get_sftp_client)
@@ -264,3 +267,116 @@ def download(
               f'attachment; filename="{os.path.basename(path)}"'
         }
     )
+
+@app.post(
+    "/files/upload/",
+    summary="Upload files to a remote directory",
+    description="Uploads one or more files to the specified remote SFTP directory."
+)
+def upload_files(
+    dest_dir: str = Query(
+        ..., 
+        description="Remote directory in which to place uploaded files"
+    ),
+    uploads: List[UploadFile] = File(
+        ..., 
+        description="One or more files to upload"
+    ),
+    sftp: SFTPClient = Depends(get_sftp_client)
+):
+    """
+    For each incoming file:
+      1. Ensure the remote destination directory exists.
+      2. Stream the file content via sftp.putfo() without buffering the entire file.
+    Returns the list of filenames successfully uploaded.
+    """
+    # 1) Ensure dest_dir exists
+    try:
+        sftp.stat(dest_dir)
+    except FileNotFoundError:
+        parts = dest_dir.rstrip("/").split("/")
+        path_acc = ""
+        for part in parts:
+            path_acc = f"{path_acc}/{part}".lstrip("/")
+            try:
+                sftp.mkdir(path_acc)
+            except OSError:
+                pass  
+
+    uploaded = []
+    for upload in uploads:
+        filename = os.path.basename(upload.filename)
+        remote_path = f"{dest_dir.rstrip('/')}/{filename}"
+
+        try:
+            sftp.stat(remote_path)
+            raise HTTPException(
+                status_code=409,
+                detail=f"File already exists: {remote_path}"
+            )
+        except FileNotFoundError:
+            pass
+
+        try:
+            sftp.putfo(upload.file, remote_path)
+            uploaded.append(filename)
+        except PermissionError:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied writing {remote_path}"
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload {filename}: {e}"
+            )
+
+    return {"uploaded": uploaded}
+
+
+
+@app.delete(
+    "/files/delete/",
+    summary="Delete one or more files or directories (recursively)",
+    description="Deletes one or more files or directories on the SFTP server. Directories are deleted recursively."
+)
+def delete_paths(
+    paths: List[str] = Body(..., example=["/remote/file1.txt", "/remote/folder1"]),
+    sftp: SFTPClient = Depends(get_sftp_client)
+):
+    """
+    Accepts a list of remote paths (files or directories). Recursively deletes each.
+    Returns a report of successfully deleted and failed paths.
+    """
+
+    def recursive_delete(path: str):
+        try:
+            attr = sftp.stat(path)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Path not found: {path}")
+
+        if S_ISDIR(attr.st_mode):
+            for entry in sftp.listdir_attr(path):
+                entry_path = f"{path.rstrip('/')}/{entry.filename}"
+                if S_ISDIR(entry.st_mode):
+                    recursive_delete(entry_path)
+                else:
+                    sftp.remove(entry_path)
+            sftp.rmdir(path)
+        else:
+            sftp.remove(path)
+
+    deleted = []
+    failed = []
+
+    for path in paths:
+        try:
+            recursive_delete(path)
+            deleted.append(path)
+        except Exception as e:
+            failed.append({"path": path, "error": str(e)})
+
+    return {
+        "deleted": deleted,
+        "failed": failed
+    }
