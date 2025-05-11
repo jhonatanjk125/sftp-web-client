@@ -1,103 +1,78 @@
 import os
 from zipstream import ZipFile as ZipStream, ZIP_DEFLATED
-from typing import List
-from colorama import Back
-from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Body
-from paramiko import SSHClient, AutoAddPolicy, SFTPClient
+from typing import List, Generator
+from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Body, Response, Cookie
+from paramiko import SSHClient, AutoAddPolicy, SFTPClient, Transport
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 from stat import S_ISDIR
 from fastapi.responses import StreamingResponse
+import secrets
+import redis
 
 
 load_dotenv()
 
 app = FastAPI(title="SFTP Web Client API")
 
-
-# Dependencies
-def get_sftp_client() -> SFTPClient:
-    """
-    Dependency that yields a connected SFTPClient,
-    then closes it when the request is done.
-    """
-    host = os.getenv("SFTP_HOST")
-    port = int(os.getenv("SFTP_PORT", 22))
-    username = os.getenv("SFTP_USERNAME")
-    password = os.getenv("SFTP_PASSWORD")
-    
-    if not host or not username or not password:
-        raise HTTPException(status_code=500, detail="SFTP credentials are not set in environment variables.")
-
-    ssh_client = SSHClient()
-    ssh_client.set_missing_host_key_policy(AutoAddPolicy())
-    ssh_client.connect(hostname=host, port=port, username=username, password=password)
-
-    sftp_client = ssh_client.open_sftp()
-    try:
-        yield sftp_client
-    finally:
-        sftp_client.close()
-        ssh_client.close()
+r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 
 
-def iter_sftp_file(sftp: SFTPClient, path: str, chunk_size: int = 16_384):
-    """
-    Generator that reads from the remote SFTP file in fixed-size chunks.
-    """
-    remote_file = sftp.open(path, "rb")
-    try:
-        while True:
-            chunk = remote_file.read(chunk_size)
-            if not chunk:
-                break
-            yield chunk
-    finally:
-        remote_file.close()
+def get_sftp_client(
+    response: Response,
+    session_token: str = Cookie(None)           
+):
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    data = r.hgetall(f"session:{session_token}")
+    if not data:
+        raise HTTPException(status_code=401, detail="Session expired")
 
 
-def stream_sftp_file(path: str, chunk_size: int = 16_384):
+    r.expire(f"session:{session_token}", timedelta(hours=1))
+
+
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        max_age=3600,     
+        httponly=True,      
+        secure=True,        
+        samesite="strict"
+    )
+
+    creds = SFTPCredentials(**data)
+    return connect_sftp(creds)
+
+def stream_sftp_file(
+    path: str,
+    sftp: SFTPClient,
+    chunk_size: int = 16_384
+
+) -> Generator[bytes, None, None]:
     """
     Generator that:
-      1. Opens an SSH + SFTP session
+      1. Uses the already-authenticated SFTPClient
       2. Opens the remote file
       3. Yields it in chunks
-      4. Closes file, sftp, ssh when done
+      4. Relies on FastAPI to close the SFTPClient when the request ends
     """
-    host = os.getenv("SFTP_HOST")
-    port = int(os.getenv("SFTP_PORT", 22))
-    user = os.getenv("SFTP_USERNAME")
-    pwd  = os.getenv("SFTP_PASSWORD") 
-
-    if not all([host, user, pwd]):
-        raise HTTPException(500, "SFTP credentials not set")
-
-    # Connect to SSH
-    ssh = SSHClient()
-    ssh.set_missing_host_key_policy(AutoAddPolicy())
-    ssh.connect(hostname=host, port=port, username=user, password=pwd)
-    sftp = ssh.open_sftp()
-
     try:
         attrs = sftp.stat(path)
         if S_ISDIR(attrs.st_mode):
-            raise HTTPException(400, f"{path} is a directory, not a file")
+            raise HTTPException(400, detail=f"{path} is a directory, not a file")
 
-        # Open and stream
-        remote = sftp.open(path, "rb")
-        try:
+        with sftp.open(path, "rb") as remote:
             while True:
                 chunk = remote.read(chunk_size)
                 if not chunk:
                     break
                 yield chunk
-        finally:
-            remote.close()
 
-    finally:
-        sftp.close()
-        ssh.close()
+    except FileNotFoundError:
+        raise HTTPException(404, detail=f"File not found: {path}")
 
 
 def walk_sftp(sftp: SFTPClient, path: str):
@@ -116,37 +91,19 @@ def walk_sftp(sftp: SFTPClient, path: str):
     for d in dirs:
         yield from walk_sftp(sftp, f"{path.rstrip('/')}/{d}")
 
-# Models
-class FileInfo(BaseModel):
-    name: str
-    size: int
-    modified: datetime
-    is_dir: bool
-
 
 def stream_directory_as_zip(
     root: str,
+    sftp: SFTPClient,
     chunk_size: int = 16_384
-):
+) -> Generator[bytes, None, None]:
     """
     Lazily walks the remote SFTP tree under `root`, and streams back
     a ZIP archive, chunk by chunk, without buffering the whole ZIP.
     """
-    host = os.getenv("SFTP_HOST")
-    port = int(os.getenv("SFTP_PORT", 22))
-    user = os.getenv("SFTP_USERNAME")
-    pwd  = os.getenv("SFTP_PASSWORD")
-    if not all([host, user, pwd]):
-        raise HTTPException(500, "Missing SFTP credentials")
-
-    ssh = SSHClient()
-    ssh.set_missing_host_key_policy(AutoAddPolicy())
-    ssh.connect(hostname=host, port=port, username=user, password=pwd)
-    sftp = ssh.open_sftp()
-
     z = ZipStream(mode="w", compression=ZIP_DEFLATED)
 
-    def walk(path):
+    def walk(path: str):
         dirs, files = [], []
         for name in sftp.listdir(path):
             full = f"{path.rstrip('/')}/{name}"
@@ -164,26 +121,45 @@ def stream_directory_as_zip(
             remote_path = f"{dirpath.rstrip('/')}/{fname}"
             arcname     = f"{rel}/{fname}" if rel else fname
 
+            # generator to stream each file’s bytes
             def file_iter(fp=remote_path):
-                rf = sftp.open(fp, "rb")
-                try:
+                with sftp.open(fp, "rb") as rf:
                     while True:
-                        data = rf.read(chunk_size)
-                        if not data:
+                        chunk = rf.read(chunk_size)
+                        if not chunk:
                             break
-                        yield data
-                finally:
-                    rf.close()
+                        yield chunk
 
             z.write_iter(arcname, file_iter())
 
-    try:
-        for chunk in z:
-            yield chunk
-    finally:
-        sftp.close()
-        ssh.close()
+    for chunk in z:
+        yield chunk
 
+# Models
+class FileInfo(BaseModel):
+    name: str
+    size: int
+    modified: datetime
+    is_dir: bool
+
+
+class SFTPCredentials(BaseModel):
+    host: str
+    port: int = 22
+    username: str
+    password: str
+
+# Utility functions
+def connect_sftp(creds: SFTPCredentials) -> SFTPClient:
+    ssh = SSHClient()
+    ssh.set_missing_host_key_policy(AutoAddPolicy())
+    ssh.connect(
+        hostname=creds.host,
+        port=creds.port,
+        username=creds.username,
+        password=creds.password
+    )
+    return ssh.open_sftp()
 
 # Routes
 @app.get("/files/", summary="List contents of an SFTP directory")
@@ -251,7 +227,7 @@ def download(
     if S_ISDIR(attrs.st_mode):
         archive_name = os.path.basename(path.rstrip("/")) or "root"
         return StreamingResponse(
-            stream_directory_as_zip(path),               
+            stream_directory_as_zip(path, sftp=sftp),               
             media_type="application/zip",
             headers={
                 "Content-Disposition": 
@@ -260,7 +236,7 @@ def download(
         )
 
     return StreamingResponse(
-        stream_sftp_file(path),                         
+        stream_sftp_file(path, sftp=sftp),                         
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": 
@@ -380,3 +356,28 @@ def delete_paths(
         "deleted": deleted,
         "failed": failed
     }
+
+
+@app.post("/auth/login")
+def login(credentials: SFTPCredentials, response: Response):
+    try:
+        client = connect_sftp(credentials)
+        client.close()
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Connection failed: {e!s}")
+
+    token = secrets.token_urlsafe(32)
+
+
+    r.hset(f"session:{token}", mapping=credentials.dict())
+    r.expire(f"session:{token}", timedelta(hours=1))
+
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        max_age=3600,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+    return {"message": "Logged in"}
