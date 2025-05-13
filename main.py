@@ -381,3 +381,23 @@ def login(credentials: SFTPCredentials, response: Response):
         samesite="strict",
     )
     return {"message": "Logged in"}
+
+
+@app.post("/auth/logout", summary="Log out and clear SFTP session")
+def logout(
+    response: Response,
+    session_token: str = Cookie(None)
+):
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    r.delete(f"session:{session_token}")
+
+    response.delete_cookie(
+        key="session_token",
+        httponly=True,
+        secure=True,    # Set to True in production
+        samesite="strict"
+    )
+
+    return {"message": "Logged out"}
