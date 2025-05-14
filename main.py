@@ -1,8 +1,9 @@
 import os
+import posixpath
 from zipstream import ZipFile as ZipStream, ZIP_DEFLATED
 from typing import List, Generator
 from fastapi import FastAPI, Depends, HTTPException, Query, File, UploadFile, Body, Response, Cookie
-from paramiko import SSHClient, AutoAddPolicy, SFTPClient, Transport
+from paramiko import SSHClient, AutoAddPolicy, SFTPClient, Transport, SFTPError
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -401,3 +402,31 @@ def logout(
     )
 
     return {"message": "Logged out"}
+
+
+@app.patch("/files/rename/", summary="Rename or move a file or directory")
+def rename_path(
+    old_path: str = Body(..., embed=True),
+    new_path: str = Body(..., embed=True),
+    sftp: SFTPClient = Depends(get_sftp_client),
+):
+    try:
+        sftp.rename(old_path, new_path)
+    except FileNotFoundError:
+        raise HTTPException(404, f"Not found: {old_path}")
+    except PermissionError:
+        raise HTTPException(403, f"Permission denied")
+    return {"renamed": old_path, "to": new_path}
+
+
+
+@app.post("/files/mkdir/", summary="Create a new directory")
+def make_dir(
+    path: str = Body(..., embed=True),
+    sftp: SFTPClient = Depends(get_sftp_client),
+):
+    try:
+        sftp.mkdir(path)
+    except OSError as e:
+        raise HTTPException(400, str(e))
+    return {"created": path}
