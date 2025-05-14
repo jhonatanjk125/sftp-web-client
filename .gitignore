@@ -1,1 +1,20 @@
-.venv
+# Dependencies
+/frontend/node_modules/
+
+# Production build output
+/frontend/dist/
+/frontend/build/
+
+# Python dependencies & caches
+__pycache__/
+/backend/__pycache__/
+/backend/*.py[cod]
+/backend/.venv/
+/backend/.env
+
+# Docker, logs, etc.
+/docker-compose.override.yml
+*.log
+
+# IDE
+.vscode/

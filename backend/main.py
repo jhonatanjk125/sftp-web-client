@@ -163,6 +163,51 @@ def connect_sftp(creds: SFTPCredentials) -> SFTPClient:
     return ssh.open_sftp()
 
 # Routes
+@app.post("/auth/login")
+def login(credentials: SFTPCredentials, response: Response):
+    try:
+        client = connect_sftp(credentials)
+        client.close()
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Connection failed: {e!s}")
+
+    token = secrets.token_urlsafe(32)
+
+
+    r.hset(f"session:{token}", mapping=credentials.dict())
+    r.expire(f"session:{token}", timedelta(hours=1))
+
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        max_age=3600,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+    return {"message": "Logged in"}
+
+
+@app.post("/auth/logout", summary="Log out and clear SFTP session")
+def logout(
+    response: Response,
+    session_token: str = Cookie(None)
+):
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    r.delete(f"session:{session_token}")
+
+    response.delete_cookie(
+        key="session_token",
+        httponly=True,
+        secure=True,    # Set to True in production
+        samesite="strict"
+    )
+
+    return {"message": "Logged out"}
+
+
 @app.get("/files/", summary="List contents of an SFTP directory")
 def list_remote_dir(
     path: str = Query(".", description="Remote directory path"),
@@ -312,6 +357,18 @@ def upload_files(
 
 
 
+@app.post("/files/mkdir/", summary="Create a new directory")
+def make_dir(
+    path: str = Body(..., embed=True),
+    sftp: SFTPClient = Depends(get_sftp_client),
+):
+    try:
+        sftp.mkdir(path)
+    except OSError as e:
+        raise HTTPException(400, str(e))
+    return {"created": path}
+
+
 @app.delete(
     "/files/delete/",
     summary="Delete one or more files or directories (recursively)",
@@ -359,50 +416,6 @@ def delete_paths(
     }
 
 
-@app.post("/auth/login")
-def login(credentials: SFTPCredentials, response: Response):
-    try:
-        client = connect_sftp(credentials)
-        client.close()
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Connection failed: {e!s}")
-
-    token = secrets.token_urlsafe(32)
-
-
-    r.hset(f"session:{token}", mapping=credentials.dict())
-    r.expire(f"session:{token}", timedelta(hours=1))
-
-    response.set_cookie(
-        key="session_token",
-        value=token,
-        max_age=3600,
-        httponly=True,
-        secure=True,
-        samesite="strict",
-    )
-    return {"message": "Logged in"}
-
-
-@app.post("/auth/logout", summary="Log out and clear SFTP session")
-def logout(
-    response: Response,
-    session_token: str = Cookie(None)
-):
-    if not session_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    r.delete(f"session:{session_token}")
-
-    response.delete_cookie(
-        key="session_token",
-        httponly=True,
-        secure=True,    # Set to True in production
-        samesite="strict"
-    )
-
-    return {"message": "Logged out"}
-
 
 @app.patch("/files/rename/", summary="Rename or move a file or directory")
 def rename_path(
@@ -417,16 +430,3 @@ def rename_path(
     except PermissionError:
         raise HTTPException(403, f"Permission denied")
     return {"renamed": old_path, "to": new_path}
-
-
-
-@app.post("/files/mkdir/", summary="Create a new directory")
-def make_dir(
-    path: str = Body(..., embed=True),
-    sftp: SFTPClient = Depends(get_sftp_client),
-):
-    try:
-        sftp.mkdir(path)
-    except OSError as e:
-        raise HTTPException(400, str(e))
-    return {"created": path}
