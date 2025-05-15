@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from "react";
+import { useAuth } from "./components/AuthContext";
+import LoginForm from "./components/LoginForm";
 import { Breadcrumbs } from "./components/Breadcrumbs";
 import { FileList }   from "./components/FileList";
 import "./App.css";
 
 export default function App() {
+  const { user, logout } = useAuth();
   const [desiredPath, setDesiredPath] = useState(".");
-
   const [currentPath, setCurrentPath] = useState(".");
-
-  const [entries, setEntries] = useState(null);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
+  const [entries, setEntries]         = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState(null);
 
   useEffect(() => {
+    if (!user) return;             
+
     setLoading(true);
     setError(null);
 
@@ -30,37 +32,41 @@ export default function App() {
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [desiredPath]);
+  }, [desiredPath, user]);        
 
+  if (!user) {
+    return (
+      <div className="app-wrapper">
+        <div className="app-card">
+          <LoginForm />
+        </div>
+      </div>
+    );
+  }
 
-  const handleDrillDown = (name) => {
-    const next = desiredPath === "." ? name : `${desiredPath}/${name}`;
-    setDesiredPath(next);
-  };
-
-
-  const handleCrumbClick = (target) => {
-    if (target !== desiredPath) {
-      setDesiredPath(target);
-    }
-  };
-
+  // Authenticated user, show the file browser and logout button
   return (
     <div className="app-wrapper">
       <div className="app-card">
-        <h1 className="app-title">🔗 SFTP Browser</h1>
+        <div className="app-header">
+          <h1 className="app-title">🔗 SFTP Browser</h1>
+          <button className="btn-logout" onClick={logout}>
+            Logout
+          </button>
+        </div>
 
-        <Breadcrumbs
-          path={currentPath}
-          onNavigate={handleCrumbClick}
-        />
+        <Breadcrumbs path={currentPath} onNavigate={setDesiredPath} />
 
         {error && <div className="error">Error: {error}</div>}
         {loading
           ? <div className="loading">Loading…</div>
           : <FileList
               entries={entries || []}
-              onDrillDown={handleDrillDown}
+              onDrillDown={name =>
+                setDesiredPath(
+                  desiredPath === "." ? name : `${desiredPath}/${name}`
+                )
+              }
             />
         }
       </div>
