@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthContext';
 
-export default function LoginForm() {
+export function LoginForm() {
   const { login, error } = useAuth();
   const [form, setForm] = useState({
     host: '',

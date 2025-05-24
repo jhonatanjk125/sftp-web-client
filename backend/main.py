@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta
 from stat import S_ISDIR
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
 import secrets
 import redis
 
@@ -16,6 +17,14 @@ import redis
 load_dotenv()
 
 app = FastAPI(title="SFTP Web Client API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],                      
+    allow_headers=["*"],                      
+)
 
 r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
 

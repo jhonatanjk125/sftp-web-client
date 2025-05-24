@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "./components/AuthContext";
-import LoginForm from "./components/LoginForm";
+import { LoginForm } from "./components/LoginForm";
 import { Breadcrumbs } from "./components/Breadcrumbs";
-import { FileList }   from "./components/FileList";
+import { FileList } from "./components/FileList";
+import { UploadForm } from "./components/UploadForm";
 import "./App.css";
 
 export default function App() {
   const { user, logout } = useAuth();
   const [desiredPath, setDesiredPath] = useState(".");
   const [currentPath, setCurrentPath] = useState(".");
-  const [entries, setEntries]         = useState(null);
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState(null);
+  const [entries, setEntries] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
-    if (!user) return;             
+    if (!user) return;
 
     setLoading(true);
     setError(null);
@@ -22,27 +25,30 @@ export default function App() {
     fetch(`/api/files/meta/?path=${encodeURIComponent(desiredPath)}`, {
       credentials: "include",
     })
-      .then(res => {
+      .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
-      .then(data => {
+      .then((data) => {
         setEntries(data);
         setCurrentPath(desiredPath);
       })
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [desiredPath, user]);
+  }, [desiredPath, user, refreshCounter]);
 
   const handleDownload = (fileName) => {
     const fullPath =
-      currentPath === "."
-        ? fileName
-        : `${currentPath}/${fileName}`;
+      currentPath === "." ? fileName : `${currentPath}/${fileName}`;
 
-    window.location.href = `/api/files/download?path=${encodeURIComponent(fullPath)}`;
+    window.location.href = `/api/files/download?path=${encodeURIComponent(
+      fullPath
+    )}`;
   };
 
+  const handleUploadSuccess = () => {
+    setRefreshCounter((c) => c + 1);
+  };
   if (!user) {
     return (
       <div className="app-wrapper">
@@ -60,33 +66,37 @@ export default function App() {
         <div className="app-header">
           <h1 className="app-title">🔗 SFTP Browser</h1>
           <button
-  className="btn-logout"
-  onClick={() => {
-    logout();
-    setDesiredPath(".");
-    setCurrentPath(".");
-    setEntries(null);
-  }}
->
-  Logout
-</button>
+            className="btn-logout"
+            onClick={() => {
+              logout();
+              setDesiredPath(".");
+              setCurrentPath(".");
+              setEntries(null);
+            }}
+          >
+            Logout
+          </button>
         </div>
-
+        <UploadForm
+          currentPath={currentPath}
+          onUploadSuccess={handleUploadSuccess}
+        />
         <Breadcrumbs path={currentPath} onNavigate={setDesiredPath} />
 
         {error && <div className="error">Error: {error}</div>}
-        {loading
-          ? <div className="loading">Loading…</div>
-          : <FileList
-              entries={entries || []}
-              onDrillDown={name =>
-                setDesiredPath(
-                  desiredPath === "." ? name : `${desiredPath}/${name}`
-                )
-              }
-              onDownload={handleDownload}
-            />
-        }
+        {loading ? (
+          <div className="loading">Loading…</div>
+        ) : (
+          <FileList
+            entries={entries || []}
+            onDrillDown={(name) =>
+              setDesiredPath(
+                desiredPath === "." ? name : `${desiredPath}/${name}`
+              )
+            }
+            onDownload={handleDownload}
+          />
+        )}
       </div>
     </div>
   );
