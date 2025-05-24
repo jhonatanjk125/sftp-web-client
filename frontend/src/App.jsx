@@ -32,7 +32,16 @@ export default function App() {
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  }, [desiredPath, user]);        
+  }, [desiredPath, user]);
+
+  const handleDownload = (fileName) => {
+    const fullPath =
+      currentPath === "."
+        ? fileName
+        : `${currentPath}/${fileName}`;
+
+    window.location.href = `/api/files/download?path=${encodeURIComponent(fullPath)}`;
+  };
 
   if (!user) {
     return (
@@ -75,6 +84,7 @@ export default function App() {
                   desiredPath === "." ? name : `${desiredPath}/${name}`
                 )
               }
+              onDownload={handleDownload}
             />
         }
       </div>

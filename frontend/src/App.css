@@ -22,6 +22,18 @@
   margin-bottom: 1rem;
 }
 
+.list-folder,
 .list-file {
-  color: black;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  color: #0066cc;
+  text-decoration: underline;
+}
+
+.list-folder:hover,
+.list-file:hover {
+  color: #004499;
 }
