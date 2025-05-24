@@ -50,9 +50,17 @@ export default function App() {
       <div className="app-card">
         <div className="app-header">
           <h1 className="app-title">🔗 SFTP Browser</h1>
-          <button className="btn-logout" onClick={logout}>
-            Logout
-          </button>
+          <button
+  className="btn-logout"
+  onClick={() => {
+    logout();
+    setDesiredPath(".");
+    setCurrentPath(".");
+    setEntries(null);
+  }}
+>
+  Logout
+</button>
         </div>
 
         <Breadcrumbs path={currentPath} onNavigate={setDesiredPath} />
