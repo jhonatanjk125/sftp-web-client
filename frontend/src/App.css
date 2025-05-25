@@ -61,3 +61,19 @@
   color: #c00;
   margin-top: 0.5em;
 }
+
+.file-entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.delete-button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #c00;
+}
+.delete-button:hover {
+  opacity: 0.7;
+}

@@ -59,6 +59,34 @@ export default function App() {
     );
   }
 
+const handleDelete = async (name) => {
+  const fullPath =
+    currentPath === "." ? name : `${currentPath}/${name}`;
+
+  if (!window.confirm(`Delete “${fullPath}”?`)) return;
+
+  try {
+    const res = await fetch("/files/delete/", {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([fullPath]),    // a one-element array
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status}: ${text}`);
+    }
+
+    // refresh the list
+    setRefreshCounter(c => c + 1);
+  } catch (err) {
+    alert("Delete failed: " + err.message);
+  }
+};
+
   // Authenticated user, show the file browser and logout button
   return (
     <div className="app-wrapper">
@@ -95,6 +123,7 @@ export default function App() {
               )
             }
             onDownload={handleDownload}
+            onDelete={handleDelete}
           />
         )}
       </div>
