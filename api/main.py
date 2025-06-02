@@ -453,3 +453,11 @@ def rename_path(
     except PermissionError:
         raise HTTPException(403, f"Permission denied")
     return {"renamed": old_path, "to": new_path}
+
+
+# ─────────────────────────────────────────────────────────────
+# mount existing `app` under the /api prefix
+# ─────────────────────────────────────────────────────────────
+root = FastAPI()
+root.mount("/api", app)
+app = root
