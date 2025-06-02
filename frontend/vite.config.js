@@ -6,21 +6,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/auth': {
-        target: 'http://localhost:8000',
+      // Any request to /api/<whatever> will be forwarded to localhost:8000/<whatever>
+      "/api": {
+        target: "http://127.0.0.1:8000",
         changeOrigin: true,
         secure: false,
-      },
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-      '/files': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
   },
-})
+});

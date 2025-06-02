@@ -7,10 +7,11 @@
 
 # Python dependencies & caches
 __pycache__/
-/backend/__pycache__/
-/backend/*.py[cod]
-/backend/.venv/
-/backend/.env
+/api/__pycache__/
+/api/*.py[cod]
+/api/.venv/
+/api/.env
+/api/run.py
 
 # Docker, logs, etc.
 /docker-compose.override.yml
@@ -18,3 +19,6 @@ __pycache__/
 
 # IDE
 .vscode/
+
+# Vercel
+.vercel/

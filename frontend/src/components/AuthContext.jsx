@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   async function login({ host, port, username, password }) {
     setError('');
     try {
-      const res = await fetch('/auth/login', {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     try {
-      const res = await fetch('/auth/logout', {
+      const res = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });

@@ -41,7 +41,7 @@ export default function App() {
     const fullPath =
       currentPath === "." ? fileName : `${currentPath}/${fileName}`;
 
-    window.location.href = `/api/files/download?path=${encodeURIComponent(
+    window.location.href = `/api/files/download/?path=${encodeURIComponent(
       fullPath
     )}`;
   };
@@ -66,7 +66,7 @@ const handleDelete = async (name) => {
   if (!window.confirm(`Delete “${fullPath}”?`)) return;
 
   try {
-    const res = await fetch("/files/delete/", {
+    const res = await fetch(`/api/files/delete/`, {
       method: "DELETE",
       credentials: "include",
       headers: {

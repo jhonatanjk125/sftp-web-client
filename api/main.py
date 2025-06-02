@@ -20,13 +20,27 @@ app = FastAPI(title="SFTP Web Client API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],                      
     allow_headers=["*"],                      
 )
 
-r = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+UPSTASH_HOST = os.getenv("UPSTASH_REDIS_URL")
+UPSTASH_PORT = os.getenv("UPSTASH_REDIS_PORT", 6379)
+UPSTASH_TOKEN = os.getenv("UPSTASH_REDIS_TOKEN")
+
+if not UPSTASH_HOST or not UPSTASH_TOKEN:
+    raise RuntimeError("Missing UPSTASH_REDIS_URL or UPSTASH_REDIS_TOKEN env vars")
+
+r = redis.Redis(
+  host=UPSTASH_HOST,
+  port=UPSTASH_PORT,
+  password=UPSTASH_TOKEN,
+  ssl=True,
+  decode_responses=True
+)
+
 
 
 def get_sftp_client(

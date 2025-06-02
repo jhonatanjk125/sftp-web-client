@@ -28,7 +28,7 @@ export function UploadForm({ currentPath, onUploadSuccess }) {
 
     try {
       // Pass dest_dir as a query param
-      const url = `/files/upload?dest_dir=${encodeURIComponent(currentPath)}`;
+      const url = `/api/files/upload/?dest_dir=${encodeURIComponent(currentPath)}`;
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
