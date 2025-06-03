@@ -1,9 +1,11 @@
+// File: src/App.jsx
 import React, { useState, useEffect } from "react";
 import { useAuth } from "./components/AuthContext";
 import { LoginForm } from "./components/LoginForm";
 import { Breadcrumbs } from "./components/Breadcrumbs";
 import { FileList } from "./components/FileList";
 import { UploadForm } from "./components/UploadForm";
+
 import "./App.css";
 
 export default function App() {
@@ -13,12 +15,10 @@ export default function App() {
   const [entries, setEntries] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   const [refreshCounter, setRefreshCounter] = useState(0);
 
   useEffect(() => {
     if (!user) return;
-
     setLoading(true);
     setError(null);
 
@@ -40,7 +40,6 @@ export default function App() {
   const handleDownload = (fileName) => {
     const fullPath =
       currentPath === "." ? fileName : `${currentPath}/${fileName}`;
-
     window.location.href = `/api/files/download/?path=${encodeURIComponent(
       fullPath
     )}`;
@@ -49,6 +48,30 @@ export default function App() {
   const handleUploadSuccess = () => {
     setRefreshCounter((c) => c + 1);
   };
+
+  const handleDelete = async (name) => {
+    const fullPath =
+      currentPath === "." ? name : `${currentPath}/${name}`;
+    if (!window.confirm(`Delete “${fullPath}”?`)) return;
+    try {
+      const res = await fetch(`/api/files/delete/`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([fullPath]), // a one‐element array
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text}`);
+      }
+      setRefreshCounter((c) => c + 1);
+    } catch (err) {
+      alert("Delete failed: " + err.message);
+    }
+  };
+
   if (!user) {
     return (
       <div className="app-wrapper">
@@ -59,73 +82,49 @@ export default function App() {
     );
   }
 
-const handleDelete = async (name) => {
-  const fullPath =
-    currentPath === "." ? name : `${currentPath}/${name}`;
-
-  if (!window.confirm(`Delete “${fullPath}”?`)) return;
-
-  try {
-    const res = await fetch(`/api/files/delete/`, {
-      method: "DELETE",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify([fullPath]),    // a one-element array
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`HTTP ${res.status}: ${text}`);
-    }
-
-    // refresh the list
-    setRefreshCounter(c => c + 1);
-  } catch (err) {
-    alert("Delete failed: " + err.message);
-  }
-};
-
-  // Authenticated user, show the file browser and logout button
   return (
-    <div className="app-wrapper">
-      <div className="app-card">
-        <div className="app-header">
-          <h1 className="app-title">🔗 SFTP Browser</h1>
-          <button
-            className="btn-logout"
-            onClick={() => {
-              logout();
-              setDesiredPath(".");
-              setCurrentPath(".");
-              setEntries(null);
-            }}
-          >
-            Logout
-          </button>
-        </div>
-        <UploadForm
-          currentPath={currentPath}
-          onUploadSuccess={handleUploadSuccess}
-        />
-        <Breadcrumbs path={currentPath} onNavigate={setDesiredPath} />
+    <div className="dashboard-container">
+      <header className="header-bar">
+        {/* … your existing header bar … */}
+      </header>
 
-        {error && <div className="error">Error: {error}</div>}
-        {loading ? (
-          <div className="loading">Loading…</div>
-        ) : (
-          <FileList
-            entries={entries || []}
-            onDrillDown={(name) =>
-              setDesiredPath(
-                desiredPath === "." ? name : `${desiredPath}/${name}`
-              )
-            }
-            onDownload={handleDownload}
-            onDelete={handleDelete}
+      <div className="main-content">
+        {/* ───── Left Panel: File Explorer ───── */}
+        <section className="file-explorer-panel">
+          {/* 1) Breadcrumbs + FileList must expand to fill vertical space */}
+          <div className="file-list-wrapper">
+            <Breadcrumbs path={currentPath} onNavigate={setDesiredPath} />
+
+            {error && <div className="error-message">Error: {error}</div>}
+            {loading ? (
+              <div className="loading">Loading…</div>
+            ) : (
+              <div className="file-list-container">
+                <FileList
+                  entries={entries || []}
+                  onDrillDown={(name) =>
+                    setDesiredPath(
+                      desiredPath === "." ? name : `${desiredPath}/${name}`
+                    )
+                  }
+                  onDownload={handleDownload}
+                  onDelete={handleDelete}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 2) UploadForm now sits at the BOTTOM of this panel */}
+          <UploadForm
+            currentPath={currentPath}
+            onUploadSuccess={handleUploadSuccess}
           />
-        )}
+        </section>
+
+        {/* ───── Right Panel: Info Cards ───── */}
+        <aside className="info-panel">
+          {/* … your Connection Info, Storage Info, Recent Activity cards … */}
+        </aside>
       </div>
     </div>
   );

@@ -15,16 +15,40 @@ export function FileList({ entries, onDrillDown, onDownload, onDelete }) {
   return (
     <ul>
       {entries.map(({ name, is_dir }) => (
-        <li key={name} className="py-1">
+        <li 
+        key={name} 
+        className={`
+        fl-item
+        ${is_dir ? "fl-item-folder" : "fl-item-file"}`}>
           {is_dir ? (
-            <button className="list-folder" onClick={() => onDrillDown(name)}>
+            <button
+              className="list-folder"
+              onClick={() => onDrillDown(name)}
+              title={`Open folder “${name}”`}
+            >
               📁 {name}
             </button>
           ) : (
-            <button className="list-file" onClick={() => onDownload(name)}>
+            <button
+              className="list-file"
+              onClick={() => onDownload(name)}
+              title={`Download file “${name}”`}
+            >
               📄 {name}
             </button>
           )}
+          <div className="action-buttons">
+          <button
+            className="action-button"
+            onClick={() =>
+              is_dir ? onDrillDown(name) : onDownload(name)
+            }
+            title={is_dir ? "Open folder" : "Download file"}
+          >
+            {is_dir ? "📂" : "⬇️"}
+          </button>
+
+          {/** — Existing delete “trash” button */}
           <button
             className="delete-button"
             onClick={() => onDelete(name)}
@@ -32,6 +56,7 @@ export function FileList({ entries, onDrillDown, onDownload, onDelete }) {
           >
             🗑️
           </button>
+          </div>
         </li>
       ))}
     </ul>
