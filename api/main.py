@@ -18,9 +18,14 @@ load_dotenv()
 
 app = FastAPI(title="SFTP Web Client API")
 
+# Get allowed origins from environment variable for production
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+# Cookie security - only secure in production
+IS_PRODUCTION = os.getenv("VERCEL_ENV") == "production"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],                      
     allow_headers=["*"],                      
@@ -63,7 +68,7 @@ def get_sftp_client(
         value=session_token,
         max_age=3600,     
         httponly=True,      
-        secure=True,        
+        secure=IS_PRODUCTION,        
         samesite="strict"
     )
 
@@ -205,7 +210,7 @@ def login(credentials: SFTPCredentials, response: Response):
         value=token,
         max_age=3600,
         httponly=True,
-        secure=True,
+        secure=IS_PRODUCTION,
         samesite="strict",
     )
     return {"message": "Logged in"}
@@ -224,7 +229,7 @@ def logout(
     response.delete_cookie(
         key="session_token",
         httponly=True,
-        secure=True,    # Set to True in production
+        secure=IS_PRODUCTION,    # Environment-aware security
         samesite="strict"
     )
 

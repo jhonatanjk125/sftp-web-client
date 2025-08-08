@@ -17,23 +17,26 @@ function httpsConfig() {
   return true as unknown as { key: Buffer; cert: Buffer };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     // https: httpsConfig(), // Disabled for development
     port: 5173,
     strictPort: true,
-    proxy: {
-      // Proxy /api to FastAPI backend (adjust target if needed)
-      "/api": {
-        target: "http://localhost:8000",
-        changeOrigin: true,
-        secure: false
+    // Remove proxy in production - Vercel handles routing
+    ...(mode === 'development' && {
+      proxy: {
+        // Proxy /api to FastAPI backend (adjust target if needed)
+        "/api": {
+          target: "http://localhost:8000",
+          changeOrigin: true,
+          secure: false
+        }
       }
-    }
+    })
   },
   preview: {
     https: httpsConfig(),
     port: 4173
   }
-});
+}));
