@@ -22,11 +22,5 @@
       "source": "/(.*)",
       "destination": "/frontend/$1"
     }
-  ],
-  "env": {
-    "ALLOWED_ORIGINS": "https://sftp-web-client.vercel.app",
-    "UPSTASH_REDIS_URL": "@upstash-redis-url",
-    "UPSTASH_REDIS_TOKEN": "@upstash-redis-token",
-    "UPSTASH_REDIS_PORT": "6379"
-  }
+  ]
 }
