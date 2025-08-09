@@ -243,7 +243,7 @@ export default function FileBrowser({
     if (selected.size === 0) return;
     const ok = window.confirm(
       `Delete ${selected.size} selected item(s)? This is ` +
-        `recursive for directories.`
+      `recursive for directories.`
     );
     if (!ok) return;
     try {
@@ -433,7 +433,7 @@ export default function FileBrowser({
           </Tooltip>
 
           <Tooltip arrow title="Color palette">
-          <IconButton
+            <IconButton
               onClick={(e) => setPaletteAnchor(e.currentTarget)}
               sx={{ mr: 0.5 }}
             >
@@ -570,6 +570,16 @@ export default function FileBrowser({
               sx={btnSx}
             >
               Download
+            </Button>
+            <Button
+              startIcon={<DeleteIcon />}
+              color="error"
+              disabled={selected.size === 0}
+              onClick={doDeleteBatch}
+              variant="outlined"
+              sx={btnSx}
+            >
+              Delete
             </Button>
 
             {isXs ? (
