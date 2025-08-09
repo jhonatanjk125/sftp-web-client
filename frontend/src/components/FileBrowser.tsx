@@ -11,6 +11,9 @@ import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import ColorLensIcon from "@mui/icons-material/ColorLens";
 import CheckIcon from "@mui/icons-material/Check";
+import FolderIcon from "@mui/icons-material/Folder";
+import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import {
   Alert,
   AppBar,
@@ -28,24 +31,22 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Toolbar,
   Tooltip,
-  Typography
+  Typography,
+  useMediaQuery
 } from "@mui/material";
-import FolderIcon from "@mui/icons-material/Folder";
-import DriveFileRenameOutlineIcon from "@mui/icons-material/DriveFileRenameOutline";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import Paper from "@mui/material/Paper";
 import React from "react";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import {
   deletePaths,
   getDownloadUrl,
@@ -67,6 +68,7 @@ type Props = {
   mode: "light" | "dark";
   preset: PalettePresetName;
 };
+
 type SortKey = "name" | "size" | "modified" | "type";
 
 function humanSize(bytes: number): string {
@@ -84,6 +86,9 @@ export default function FileBrowser({
   mode,
   preset
 }: Props) {
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+
   const [path, setPath] = React.useState<string>(".");
   const [items, setItems] = React.useState<FileInfo[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -94,9 +99,7 @@ export default function FileBrowser({
   const [sortKey, setSortKey] = React.useState<SortKey>("name");
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc");
 
-  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(
-    null
-  );
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [paletteAnchor, setPaletteAnchor] =
     React.useState<null | HTMLElement>(null);
 
@@ -167,7 +170,9 @@ export default function FileBrowser({
 
   function handleToggleAll(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.checked) {
-      const all = new Set(items.map((it) => joinPaths(path, it.name)));
+      const all = new Set(
+        items.map((it) => joinPaths(path, it.name))
+      );
       setSelected(all);
     } else {
       setSelected(new Set());
@@ -322,13 +327,80 @@ export default function FileBrowser({
 
   const brand = palettes[preset].gradients.brand;
 
+  const btnSx = { width: { xs: "100%", sm: "auto" } };
+
+  // Mobile card item renderer
+  function MobileFileCard(it: FileInfo) {
+    const full = joinPaths(path, it.name);
+    const checked = selected.has(full);
+    return (
+      <Paper
+        key={full}
+        variant="outlined"
+        sx={{
+          p: 1.25,
+          mb: 1,
+          borderRadius: 2,
+          borderColor: checked
+            ? (t) => alpha(t.palette.primary.main, 0.5)
+            : undefined,
+          backgroundColor: checked
+            ? (t) => alpha(t.palette.primary.main, 0.06)
+            : undefined
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          onClick={() => (it.is_dir ? openDir(it.name) : undefined)}
+          sx={{ cursor: it.is_dir ? "pointer" : "default" }}
+        >
+          <Checkbox
+            checked={checked}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => handleToggleOne(full)}
+            sx={{ mr: 0.5 }}
+          />
+          {it.is_dir ? (
+            <FolderIcon color="primary" />
+          ) : (
+            <InsertDriveFileIcon />
+          )}
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography
+              variant="body2"
+              noWrap
+              title={it.name}
+              sx={{ fontWeight: 600 }}
+            >
+              {it.name}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ opacity: 0.7 }}
+              noWrap
+              title={new Date(it.modified).toLocaleString()}
+            >
+              {it.is_dir ? "Directory" : humanSize(it.size)} •{" "}
+              {new Date(it.modified).toLocaleString()}
+            </Typography>
+          </Box>
+        </Stack>
+      </Paper>
+    );
+  }
+
   return (
     <Box height="100vh" display="flex" flexDirection="column">
       <AppBar position="sticky" elevation={0}>
         <Toolbar
           sx={{
             borderBottom: (t) =>
-              `1px solid ${alpha("#000", t.palette.mode === "dark" ? 0.26 : 0.08)}`,
+              `1px solid ${alpha(
+                "#000",
+                t.palette.mode === "dark" ? 0.26 : 0.08
+              )}`,
             backdropFilter: "blur(12px)"
           }}
         >
@@ -348,6 +420,7 @@ export default function FileBrowser({
           >
             SFTP Web Client
           </Typography>
+
           <Tooltip
             arrow
             title={
@@ -360,7 +433,7 @@ export default function FileBrowser({
           </Tooltip>
 
           <Tooltip arrow title="Color palette">
-            <IconButton
+          <IconButton
               onClick={(e) => setPaletteAnchor(e.currentTarget)}
               sx={{ mr: 0.5 }}
             >
@@ -434,7 +507,15 @@ export default function FileBrowser({
           mb={2}
         >
           <BreadcrumbsBar path={path} onNavigate={(p) => setPath(p)} />
-          <Stack direction="row" spacing={1} flexWrap="wrap">
+
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            useFlexGap
+            flexWrap={{ sm: "wrap" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
             <input
               type="file"
               ref={fileInputRef}
@@ -442,10 +523,12 @@ export default function FileBrowser({
               hidden
               onChange={(e) => handleFilesAdded(e.target.files)}
             />
+
             <Button
               startIcon={<UploadFileIcon />}
               variant="contained"
               onClick={() => fileInputRef.current?.click()}
+              sx={btnSx}
             >
               Upload
             </Button>
@@ -454,6 +537,7 @@ export default function FileBrowser({
               onClick={() => setMkdirOpen(true)}
               color="secondary"
               variant="contained"
+              sx={btnSx}
             >
               New Folder
             </Button>
@@ -462,6 +546,7 @@ export default function FileBrowser({
               disabled={selected.size !== 1}
               onClick={beginRename}
               variant="outlined"
+              sx={btnSx}
             >
               Rename
             </Button>
@@ -473,6 +558,7 @@ export default function FileBrowser({
                 setMoveOpen(true);
               }}
               variant="outlined"
+              sx={btnSx}
             >
               Move To...
             </Button>
@@ -481,21 +567,25 @@ export default function FileBrowser({
               disabled={selected.size === 0}
               onClick={doDownloadSelected}
               variant="outlined"
+              sx={btnSx}
             >
               Download
             </Button>
-            <Button
-              startIcon={<DeleteIcon />}
-              color="error"
-              disabled={selected.size === 0}
-              onClick={doDeleteBatch}
-              variant="outlined"
-            >
-              Delete
-            </Button>
-            <IconButton onClick={() => refresh()}>
-              <RefreshIcon />
-            </IconButton>
+
+            {isXs ? (
+              <Button
+                startIcon={<RefreshIcon />}
+                onClick={() => refresh()}
+                variant="outlined"
+                sx={btnSx}
+              >
+                Refresh
+              </Button>
+            ) : (
+              <IconButton onClick={() => refresh()}>
+                <RefreshIcon />
+              </IconButton>
+            )}
           </Stack>
         </Stack>
 
@@ -520,151 +610,221 @@ export default function FileBrowser({
           </Alert>
         )}
 
-        <TableContainer component={Paper} sx={{ mt: 1, overflow: "hidden" }}>
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    indeterminate={indeterminate}
-                    checked={allChecked}
-                    onChange={handleToggleAll}
-                  />
-                </TableCell>
-                <TableCell
-                  sx={{ cursor: "pointer" }}
-                  onClick={() => {
-                    setSortKey("name");
-                    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                  }}
-                >
-                  Name
-                </TableCell>
-                <TableCell
-                  align="right"
-                  sx={{ cursor: "pointer", width: 120 }}
-                  onClick={() => {
-                    setSortKey("size");
-                    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                  }}
-                >
-                  Size
-                </TableCell>
-                <TableCell
-                  sx={{ cursor: "pointer", width: 220 }}
-                  onClick={() => {
-                    setSortKey("modified");
-                    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                  }}
-                >
-                  Modified
-                </TableCell>
-                <TableCell
-                  sx={{ cursor: "pointer", width: 100 }}
-                  onClick={() => {
-                    setSortKey("type");
-                    setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-                  }}
-                >
-                  Type
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {!isRoot(path) && (
-                <TableRow
-                  hover
-                  onDoubleClick={goUp}
-                  sx={{ userSelect: "none", cursor: "pointer" }}
-                >
-                  <TableCell padding="checkbox" />
-                  <TableCell colSpan={4}>
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <FolderIcon fontSize="small" />
-                      <Typography variant="body2">..</Typography>
-                    </Stack>
+        {/* Mobile: card view */}
+        {isXs ? (
+          <Box>
+            {!isRoot(path) && (
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 1.25,
+                  mb: 1,
+                  borderRadius: 2,
+                  cursor: "pointer",
+                  "&:hover": {
+                    backgroundColor: (t) => alpha("#000", 0.04)
+                  }
+                }}
+                onClick={goUp}
+              >
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box sx={{ width: 40 }} />
+                  <FolderIcon fontSize="small" />
+                  <Typography variant="body2">..</Typography>
+                </Stack>
+              </Paper>
+            )}
+            {sortedItems.map((it) => MobileFileCard(it))}
+            {sortedItems.length === 0 && (
+              <Paper variant="outlined" sx={{ p: 3, textAlign: "center" }}>
+                <Stack spacing={1} alignItems="center" sx={{ opacity: 0.7 }}>
+                  <DriveFolderUploadIcon />
+                  <Typography variant="body2">
+                    This folder is empty. Upload files or create a folder.
+                  </Typography>
+                </Stack>
+              </Paper>
+            )}
+          </Box>
+        ) : (
+          // Desktop/tablet: table view with horizontal scroll if needed
+          <TableContainer
+            component={Paper}
+            sx={{
+              mt: 1,
+              overflowX: "auto",
+              overflowY: "hidden",
+              WebkitOverflowScrolling: "touch",
+              borderRadius: 2
+            }}
+          >
+            <Table size="small" stickyHeader sx={{ minWidth: 760 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      indeterminate={indeterminate}
+                      checked={allChecked}
+                      onChange={handleToggleAll}
+                    />
+                  </TableCell>
+                  <TableCell
+                    sx={{ cursor: "pointer", minWidth: 220 }}
+                    onClick={() => {
+                      setSortKey("name");
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    }}
+                  >
+                    Name
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      cursor: "pointer",
+                      width: 120,
+                      whiteSpace: "nowrap"
+                    }}
+                    onClick={() => {
+                      setSortKey("size");
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    }}
+                  >
+                    Size
+                  </TableCell>
+                  <TableCell
+                    sx={{
+                      cursor: "pointer",
+                      width: 220,
+                      minWidth: 200,
+                      whiteSpace: "nowrap"
+                    }}
+                    onClick={() => {
+                      setSortKey("modified");
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    }}
+                  >
+                    Modified
+                  </TableCell>
+                  <TableCell
+                    sx={{ cursor: "pointer", width: 120, minWidth: 100 }}
+                    onClick={() => {
+                      setSortKey("type");
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+                    }}
+                  >
+                    Type
                   </TableCell>
                 </TableRow>
-              )}
-              {sortedItems.map((it) => {
-                const full = joinPaths(path, it.name);
-                const checked = selected.has(full);
-                return (
+              </TableHead>
+
+              <TableBody>
+                {!isRoot(path) && (
                   <TableRow
-                    key={full}
                     hover
-                    sx={{
-                      userSelect: "none",
-                      cursor: it.is_dir ? "pointer" : "default",
-                      transition: "background-color .15s ease",
-                      ...(checked && {
-                        backgroundColor: (t) =>
-                          alpha(t.palette.primary.main, 0.1)
-                      }),
-                      "&:hover": {
-                        backgroundColor: (t) => alpha("#000", 0.05)
-                      }
-                    }}
-                    onDoubleClick={() =>
-                      it.is_dir ? openDir(it.name) : null
-                    }
+                    onDoubleClick={goUp}
+                    sx={{ userSelect: "none", cursor: "pointer" }}
                   >
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={checked}
-                        onChange={() => handleToggleOne(full)}
-                      />
-                    </TableCell>
-                    <TableCell>
+                    <TableCell padding="checkbox" />
+                    <TableCell colSpan={4}>
                       <Stack
                         direction="row"
                         spacing={1}
                         alignItems="center"
-                        onClick={() =>
-                          it.is_dir ? openDir(it.name) : null
-                        }
                       >
-                        {it.is_dir ? (
-                          <FolderIcon color="primary" />
-                        ) : (
-                          <InsertDriveFileIcon />
-                        )}
-                        <Typography variant="body2">{it.name}</Typography>
+                        <FolderIcon fontSize="small" />
+                        <Typography variant="body2">..</Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell align="right">
-                      {it.is_dir ? "-" : humanSize(it.size)}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(it.modified).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      {it.is_dir ? "Directory" : "File"}
+                  </TableRow>
+                )}
+
+                {sortedItems.map((it) => {
+                  const full = joinPaths(path, it.name);
+                  const checked = selected.has(full);
+                  return (
+                    <TableRow
+                      key={full}
+                      hover
+                      sx={{
+                        userSelect: "none",
+                        cursor: it.is_dir ? "pointer" : "default",
+                        transition: "background-color .15s ease",
+                        ...(checked && {
+                          backgroundColor: (t) =>
+                            alpha(t.palette.primary.main, 0.1)
+                        }),
+                        "&:hover": {
+                          backgroundColor: (t) => alpha("#000", 0.05)
+                        }
+                      }}
+                      onDoubleClick={() =>
+                        it.is_dir ? openDir(it.name) : null
+                      }
+                    >
+                      <TableCell padding="checkbox">
+                        <Checkbox
+                          checked={checked}
+                          onChange={() => handleToggleOne(full)}
+                        />
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                          onClick={() =>
+                            it.is_dir ? openDir(it.name) : null
+                          }
+                        >
+                          {it.is_dir ? (
+                            <FolderIcon color="primary" />
+                          ) : (
+                            <InsertDriveFileIcon />
+                          )}
+                          <Typography variant="body2">
+                            {it.name}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+
+                      <TableCell align="right">
+                        {it.is_dir ? "-" : humanSize(it.size)}
+                      </TableCell>
+
+                      <TableCell sx={{ whiteSpace: "nowrap" }}>
+                        {new Date(it.modified).toLocaleString()}
+                      </TableCell>
+
+                      <TableCell>
+                        {it.is_dir ? "Directory" : "File"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {sortedItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <Stack
+                        py={4}
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ opacity: 0.7 }}
+                      >
+                        <DriveFolderUploadIcon />
+                        <Typography variant="body2">
+                          This folder is empty. Upload files or create a
+                          folder.
+                        </Typography>
+                      </Stack>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-              {sortedItems.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <Stack
-                      py={4}
-                      spacing={1}
-                      alignItems="center"
-                      sx={{ opacity: 0.7 }}
-                    >
-                      <DriveFolderUploadIcon />
-                      <Typography variant="body2">
-                        This folder is empty. Upload files or create a
-                        folder.
-                      </Typography>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
 
         {dragActive && (
           <Box
