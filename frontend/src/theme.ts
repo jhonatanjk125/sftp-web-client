@@ -27,6 +27,7 @@ export default function makeTheme(
         blur: "blur(14px) saturate(160%)"
       };
 
+  // Label vertical centering (kept from earlier)
   const labelRestY = 14;
   const labelRestYSmall = 10;
   const labelShrinkY = -8;
@@ -62,7 +63,7 @@ export default function makeTheme(
             boxShadow: glass.shadow,
             backdropFilter: glass.blur,
             WebkitBackdropFilter: glass.blur,
-            overflow: "visible"
+            overflow: "visible" // avoid clipping inside glass surfaces
           }
         }
       },
@@ -99,6 +100,23 @@ export default function makeTheme(
             boxShadow: glass.shadow,
             backdropFilter: glass.blur,
             WebkitBackdropFilter: glass.blur,
+            overflow: "visible" // critical for floating labels
+          }
+        }
+      },
+      // Ensure dialog content itself doesn't clip children
+      MuiDialogContent: {
+        styleOverrides: {
+          root: {
+            overflow: "visible",
+            position: "relative"
+          }
+        }
+      },
+      // Prevent any FormControl from clipping its floating label
+      MuiFormControl: {
+        styleOverrides: {
+          root: {
             overflow: "visible"
           }
         }
@@ -114,16 +132,16 @@ export default function makeTheme(
           }
         }
       },
+      // Input/label stacking fixes + centered resting label
       MuiOutlinedInput: {
         styleOverrides: {
           root: {
-            backgroundColor: alpha(
-              isDark ? "#fff" : "#000",
-              isDark ? 0.05 : 0.02
-            ),
+            backgroundColor: alpha(isDark ? "#fff" : "#000", isDark ? 0.05 : 0.02),
             borderRadius: 12,
+            position: "relative", // create a local stacking context
             "& .MuiOutlinedInput-notchedOutline": {
-              borderColor: alpha(isDark ? "#fff" : "#000", 0.12)
+              borderColor: alpha(isDark ? "#fff" : "#000", 0.12),
+              zIndex: 1 // sit below the label
             },
             "&:hover .MuiOutlinedInput-notchedOutline": {
               borderColor: alpha(isDark ? "#fff" : "#000", 0.22)
@@ -139,6 +157,8 @@ export default function makeTheme(
       MuiInputLabel: {
         styleOverrides: {
           root: {
+            zIndex: 2, // draw above the notched outline
+            pointerEvents: "none",
             transition: "transform .2s ease",
             "&.MuiInputLabel-outlined": {
               transform: `translate(14px, ${labelRestY}px) scale(1)`,
@@ -199,10 +219,7 @@ export default function makeTheme(
       MuiTableCell: {
         styleOverrides: {
           head: {
-            background: alpha(
-              isDark ? "#fff" : "#000",
-              isDark ? 0.06 : 0.03
-            ),
+            background: alpha(isDark ? "#fff" : "#000", isDark ? 0.06 : 0.03),
             borderBottom: `1px solid ${alpha(
               isDark ? "#fff" : "#000",
               isDark ? 0.14 : 0.08
