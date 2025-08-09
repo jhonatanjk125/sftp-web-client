@@ -3,13 +3,21 @@ import React from "react";
 import { logout, probeSession } from "./api";
 import FileBrowser from "./components/FileBrowser";
 import LoginForm from "./components/LoginForm";
+import type { PalettePresetName } from "./palette";
 
 type Props = {
   mode: "light" | "dark";
+  preset: PalettePresetName;
   onToggleTheme: () => void;
+  onChangePreset: (p: PalettePresetName) => void;
 };
 
-export default function App({ mode, onToggleTheme }: Props) {
+export default function App({
+  mode,
+  preset,
+  onToggleTheme,
+  onChangePreset
+}: Props) {
   const [checking, setChecking] = React.useState(true);
   const [authed, setAuthed] = React.useState(false);
   const [snack, setSnack] = React.useState<string | null>(null);
@@ -49,7 +57,9 @@ export default function App({ mode, onToggleTheme }: Props) {
     <>
       <FileBrowser
         mode={mode}
+        preset={preset}
         onToggleTheme={onToggleTheme}
+        onChangePreset={onChangePreset}
         onLogout={() => {
           void doLogout();
         }}
@@ -72,7 +82,9 @@ export default function App({ mode, onToggleTheme }: Props) {
   ) : (
     <LoginForm
       mode={mode}
+      preset={preset}
       onToggleTheme={onToggleTheme}
+      onChangePreset={onChangePreset}
       onLoggedIn={() => {
         setAuthed(true);
       }}

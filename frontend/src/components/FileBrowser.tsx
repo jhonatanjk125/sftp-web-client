@@ -9,6 +9,8 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import ColorLensIcon from "@mui/icons-material/ColorLens";
+import CheckIcon from "@mui/icons-material/Check";
 import {
   Alert,
   AppBar,
@@ -55,11 +57,15 @@ import {
 import type { FileInfo } from "../types";
 import { basename, isRoot, joinPaths, parentDir } from "../utils/path";
 import BreadcrumbsBar from "./BreadcrumbsBar";
+import type { PalettePresetName } from "../palette";
+import { PALETTE_OPTIONS, palettes } from "../palette";
 
 type Props = {
   onLogout: () => void;
   onToggleTheme: () => void;
+  onChangePreset: (p: PalettePresetName) => void;
   mode: "light" | "dark";
+  preset: PalettePresetName;
 };
 type SortKey = "name" | "size" | "modified" | "type";
 
@@ -74,7 +80,9 @@ function humanSize(bytes: number): string {
 export default function FileBrowser({
   onLogout,
   onToggleTheme,
-  mode
+  onChangePreset,
+  mode,
+  preset
 }: Props) {
   const [path, setPath] = React.useState<string>(".");
   const [items, setItems] = React.useState<FileInfo[]>([]);
@@ -89,6 +97,8 @@ export default function FileBrowser({
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(
     null
   );
+  const [paletteAnchor, setPaletteAnchor] =
+    React.useState<null | HTMLElement>(null);
 
   const [mkdirOpen, setMkdirOpen] = React.useState(false);
   const [mkdirName, setMkdirName] = React.useState("");
@@ -228,7 +238,7 @@ export default function FileBrowser({
     if (selected.size === 0) return;
     const ok = window.confirm(
       `Delete ${selected.size} selected item(s)? This is ` +
-      `recursive for directories.`
+        `recursive for directories.`
     );
     if (!ok) return;
     try {
@@ -310,6 +320,8 @@ export default function FileBrowser({
     items.every((it) => selected.has(joinPaths(path, it.name)));
   const indeterminate = selected.size > 0 && !allChecked;
 
+  const brand = palettes[preset].gradients.brand;
+
   return (
     <Box height="100vh" display="flex" flexDirection="column">
       <AppBar position="sticky" elevation={0}>
@@ -325,8 +337,7 @@ export default function FileBrowser({
             sx={{
               flexGrow: 1,
               fontWeight: 900,
-              background:
-                "linear-gradient(90deg,#86A8E7,#91EAE4,#86A8E7)",
+              background: brand,
               backgroundSize: "200% 100%",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
@@ -347,6 +358,40 @@ export default function FileBrowser({
               {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
+
+          <Tooltip arrow title="Color palette">
+            <IconButton
+              onClick={(e) => setPaletteAnchor(e.currentTarget)}
+              sx={{ mr: 0.5 }}
+            >
+              <ColorLensIcon />
+            </IconButton>
+          </Tooltip>
+          <Menu
+            anchorEl={paletteAnchor}
+            open={Boolean(paletteAnchor)}
+            onClose={() => setPaletteAnchor(null)}
+          >
+            {PALETTE_OPTIONS.map((opt) => (
+              <MenuItem
+                key={opt.name}
+                onClick={() => {
+                  onChangePreset(opt.name);
+                  setPaletteAnchor(null);
+                }}
+              >
+                <ListItemIcon>
+                  {preset === opt.name ? (
+                    <CheckIcon fontSize="small" />
+                  ) : (
+                    <span style={{ width: 24 }} />
+                  )}
+                </ListItemIcon>
+                <ListItemText>{opt.label}</ListItemText>
+              </MenuItem>
+            ))}
+          </Menu>
+
           <Tooltip title="More">
             <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
               <MoreVertIcon />
@@ -630,13 +675,17 @@ export default function FileBrowser({
               border: (t) =>
                 `2px dashed ${alpha(t.palette.primary.main, 0.6)}`,
               background: (t) =>
-                `linear-gradient(135deg, rgba(134,168,231,.14), rgba(145,234,228,.1))`,
+                `linear-gradient(135deg, ${alpha(
+                  t.palette.primary.main,
+                  0.16
+                )}, ${alpha(t.palette.secondary.main, 0.12)})`,
               backdropFilter: "blur(8px)",
               WebkitBackdropFilter: "blur(8px)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: (t) => alpha("#000", t.palette.mode === "dark" ? 0.1 : 0.6),
+              color: (t) =>
+                alpha("#000", t.palette.mode === "dark" ? 0.1 : 0.6),
               pointerEvents: "none",
               zIndex: 10
             }}

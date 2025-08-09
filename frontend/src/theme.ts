@@ -1,16 +1,17 @@
 import { alpha, createTheme } from "@mui/material/styles";
 import type { PaletteMode } from "@mui/material";
+import type { PalettePresetName } from "./palette";
+import { palettes } from "./palette";
 
-const gradients = {
-  brand:
-    "linear-gradient(135deg, #7F7FD5 0%, #86A8E7 50%, #91EAE4 100%)",
-  accent: "linear-gradient(135deg, #FF9A9E 0%, #FAD0C4 100%)",
-  success: "linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)",
-  warning: "linear-gradient(135deg, #f6d365 0%, #fda085 100%)"
-};
-
-function makeTheme(mode: PaletteMode) {
+export default function makeTheme(
+  mode: PaletteMode,
+  preset: PalettePresetName
+) {
   const isDark = mode === "dark";
+  const p = palettes[preset];
+
+  const primaryMain = isDark ? p.primaryDark : p.primaryLight;
+  const secondaryMain = isDark ? p.secondaryDark : p.secondaryLight;
 
   const glass = isDark
     ? {
@@ -26,11 +27,15 @@ function makeTheme(mode: PaletteMode) {
         blur: "blur(14px) saturate(160%)"
       };
 
+  const labelRestY = 14;
+  const labelRestYSmall = 10;
+  const labelShrinkY = -8;
+
   return createTheme({
     palette: {
       mode,
-      primary: { main: isDark ? "#86A8E7" : "#3b82f6" },
-      secondary: { main: isDark ? "#FAD0C4" : "#f59e0b" },
+      primary: { main: primaryMain },
+      secondary: { main: secondaryMain },
       background: {
         default: isDark ? "#0b0f15" : "#f6f8fb",
         paper: isDark ? "#0b0f15" : "#ffffff"
@@ -105,7 +110,7 @@ function makeTheme(mode: PaletteMode) {
             border: `1px solid ${glass.border}`,
             boxShadow: glass.shadow,
             backdropFilter: glass.blur,
-            WebkitBackdropFilter: glass.blur
+            WebkitBackdropFilter: "blur(14px)"
           }
         }
       },
@@ -124,10 +129,29 @@ function makeTheme(mode: PaletteMode) {
               borderColor: alpha(isDark ? "#fff" : "#000", 0.22)
             },
             "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-              borderColor: alpha("#86A8E7", 0.6)
+              borderColor: alpha(primaryMain, 0.6)
             }
           },
-          input: { paddingTop: 12, paddingBottom: 12 }
+          input: { padding: "14px 14px", lineHeight: 1.5 },
+          inputSizeSmall: { padding: "10px 14px" }
+        }
+      },
+      MuiInputLabel: {
+        styleOverrides: {
+          root: {
+            transition: "transform .2s ease",
+            "&.MuiInputLabel-outlined": {
+              transform: `translate(14px, ${labelRestY}px) scale(1)`,
+              color: isDark ? alpha("#fff", 0.7) : "#334155"
+            },
+            "&.MuiInputLabel-sizeSmall.MuiInputLabel-outlined": {
+              transform: `translate(14px, ${labelRestYSmall}px) scale(1)`
+            },
+            "&.MuiInputLabel-shrink": {
+              transform: `translate(14px, ${labelShrinkY}px) scale(0.75)`,
+              color: isDark ? alpha("#fff", 0.8) : "#0b1220"
+            }
+          }
         }
       },
       MuiButton: {
@@ -139,15 +163,15 @@ function makeTheme(mode: PaletteMode) {
             letterSpacing: 0.2
           },
           containedPrimary: {
-            backgroundImage: gradients.brand,
+            backgroundImage: p.gradients.brand,
             color: "#0b0f15",
-            boxShadow: "0 6px 20px rgba(134,168,231,0.35)",
+            boxShadow: `0 6px 20px ${alpha(primaryMain, 0.35)}`,
             "&:hover": { filter: "brightness(1.06)" }
           },
           containedSecondary: {
-            backgroundImage: gradients.accent,
+            backgroundImage: p.gradients.accent,
             color: "#0b0f15",
-            boxShadow: "0 6px 20px rgba(250,208,196,0.35)",
+            boxShadow: `0 6px 20px ${alpha(secondaryMain, 0.35)}`,
             "&:hover": { filter: "brightness(1.06)" }
           },
           outlined: {
@@ -175,7 +199,10 @@ function makeTheme(mode: PaletteMode) {
       MuiTableCell: {
         styleOverrides: {
           head: {
-            background: alpha(isDark ? "#fff" : "#000", isDark ? 0.06 : 0.03),
+            background: alpha(
+              isDark ? "#fff" : "#000",
+              isDark ? 0.06 : 0.03
+            ),
             borderBottom: `1px solid ${alpha(
               isDark ? "#fff" : "#000",
               isDark ? 0.14 : 0.08
@@ -185,17 +212,13 @@ function makeTheme(mode: PaletteMode) {
             fontWeight: 700
           },
           body: {
-            borderBottom: `1px solid ${alpha(
-              "#000",
-              isDark ? 0.12 : 0.08
-            )}`
+            borderBottom: `1px solid ${alpha("#000", isDark ? 0.12 : 0.08)}`
           }
         }
       },
       MuiTooltip: {
         styleOverrides: {
           tooltip: {
-            // High-contrast tooltip for both modes
             backgroundColor: alpha("#0b1220", 0.96),
             color: "#ffffff",
             border: `1px solid ${alpha("#000", 0.4)}`,
@@ -210,6 +233,3 @@ function makeTheme(mode: PaletteMode) {
     }
   });
 }
-
-export default makeTheme;
-export { gradients };

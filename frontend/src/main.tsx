@@ -8,6 +8,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import makeTheme from "./theme";
 import Background from "./components/Background";
+import type { PalettePresetName } from "./palette";
+import { palettes } from "./palette";
 
 function getInitialMode(): "light" | "dark" {
   const stored = localStorage.getItem("theme-mode");
@@ -18,16 +20,31 @@ function getInitialMode(): "light" | "dark" {
     : "light";
 }
 
+function getInitialPreset(): PalettePresetName {
+  const stored = localStorage.getItem("theme-preset") as
+    | PalettePresetName
+    | null;
+  if (stored && palettes[stored]) return stored;
+  return "jade";
+}
+
 export default function Root() {
   const [mode, setMode] = React.useState<"light" | "dark">(
     getInitialMode()
+  );
+  const [preset, setPreset] = React.useState<PalettePresetName>(
+    getInitialPreset()
   );
 
   React.useEffect(() => {
     localStorage.setItem("theme-mode", mode);
   }, [mode]);
 
-  const theme = React.useMemo(() => makeTheme(mode), [mode]);
+  React.useEffect(() => {
+    localStorage.setItem("theme-preset", preset);
+  }, [preset]);
+
+  const theme = React.useMemo(() => makeTheme(mode, preset), [mode, preset]);
 
   return (
     <React.StrictMode>
@@ -39,37 +56,49 @@ export default function Root() {
             body: {
               height: "100%",
               colorScheme: mode,
-              backgroundColor:
-                mode === "dark" ? "#0b0f15" : "#f6f8fb"
+              backgroundColor: mode === "dark" ? "#0b0f15" : "#f6f8fb"
             },
             "#root": { height: "100%" },
             "@keyframes auroraFloat1": {
-              "0%": { transform: "translate3d(-10vw, -5vh, 0) scale(1)" },
-              "100%": { transform: "translate3d(20vw, -10vh, 0) scale(1.25)" }
+              "0%": {
+                transform: "translate3d(-10vw, -5vh, 0) scale(1)"
+              },
+              "100%": {
+                transform: "translate3d(20vw, -10vh, 0) scale(1.25)"
+              }
             },
             "@keyframes auroraFloat2": {
               "0%": { transform: "translate3d(10vw, 10vh, 0) scale(1)" },
-              "100%": { transform: "translate3d(-20vw, 5vh, 0) scale(1.2)" }
+              "100%": {
+                transform: "translate3d(-20vw, 5vh, 0) scale(1.2)"
+              }
             },
             "@keyframes auroraFloat3": {
               "0%": { transform: "translate3d(-5vw, 15vh, 0) scale(1)" },
-              "100%": { transform: "translate3d(15vw, -15vh, 0) scale(1.15)" }
+              "100%": {
+                transform: "translate3d(15vw, -15vh, 0) scale(1.15)"
+              }
             },
             "@keyframes gradientShift": {
               "0%": { backgroundPosition: "0% 50%" },
               "100%": { backgroundPosition: "100% 50%" }
             },
             "@media (prefers-reduced-motion: reduce)": {
-              "*": { animation: "none !important", transition: "none !important" }
+              "*": {
+                animation: "none !important",
+                transition: "none !important"
+              }
             }
           }}
         />
-        <Background mode={mode} />
+        <Background mode={mode} preset={preset} />
         <App
           mode={mode}
+          preset={preset}
           onToggleTheme={() =>
             setMode((m) => (m === "dark" ? "light" : "dark"))
           }
+          onChangePreset={(p) => setPreset(p)}
         />
       </ThemeProvider>
     </React.StrictMode>

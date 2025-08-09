@@ -6,6 +6,10 @@ import {
   CardContent,
   CircularProgress,
   IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
   Stack,
   TextField,
   Tooltip,
@@ -15,17 +19,26 @@ import React from "react";
 import { login } from "../api";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
+import ColorLensIcon from "@mui/icons-material/ColorLens";
+import CheckIcon from "@mui/icons-material/Check";
+import type { PalettePresetName } from "../palette";
+import { PALETTE_OPTIONS, palettes } from "../palette";
+import { alpha } from "@mui/material/styles";
 
 type Props = {
   onLoggedIn: () => void;
   mode: "light" | "dark";
+  preset: PalettePresetName;
   onToggleTheme: () => void;
+  onChangePreset: (p: PalettePresetName) => void;
 };
 
 export default function LoginForm({
   onLoggedIn,
   mode,
-  onToggleTheme
+  preset,
+  onToggleTheme,
+  onChangePreset
 }: Props) {
   const [host, setHost] = React.useState("");
   const [port, setPort] = React.useState<number>(22);
@@ -33,6 +46,9 @@ export default function LoginForm({
   const [password, setPassword] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const [paletteAnchor, setPaletteAnchor] =
+    React.useState<null | HTMLElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +64,8 @@ export default function LoginForm({
     }
   }
 
+  const brand = palettes[preset].gradients.brand;
+
   return (
     <Box
       minHeight="100vh"
@@ -56,13 +74,14 @@ export default function LoginForm({
       justifyContent="center"
       sx={{ p: 2 }}
     >
-      {/* Theme toggle (visible on login screen) */}
       <Box
         sx={{
           position: "fixed",
           top: 12,
           right: 12,
-          zIndex: 10
+          zIndex: 10,
+          display: "flex",
+          gap: 1
         }}
       >
         <Tooltip
@@ -75,6 +94,39 @@ export default function LoginForm({
             {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
           </IconButton>
         </Tooltip>
+
+        <Tooltip arrow title="Color palette">
+          <IconButton
+            onClick={(e) => setPaletteAnchor(e.currentTarget)}
+            size="large"
+          >
+            <ColorLensIcon />
+          </IconButton>
+        </Tooltip>
+        <Menu
+          anchorEl={paletteAnchor}
+          open={Boolean(paletteAnchor)}
+          onClose={() => setPaletteAnchor(null)}
+        >
+          {PALETTE_OPTIONS.map((opt) => (
+            <MenuItem
+              key={opt.name}
+              onClick={() => {
+                onChangePreset(opt.name);
+                setPaletteAnchor(null);
+              }}
+            >
+              <ListItemIcon>
+                {preset === opt.name ? (
+                  <CheckIcon fontSize="small" />
+                ) : (
+                  <span style={{ width: 24 }} />
+                )}
+              </ListItemIcon>
+              <ListItemText>{opt.label}</ListItemText>
+            </MenuItem>
+          ))}
+        </Menu>
       </Box>
 
       <Card
@@ -90,11 +142,11 @@ export default function LoginForm({
             position: "absolute",
             inset: 0,
             pointerEvents: "none",
-            background:
+            background: (t) =>
               "radial-gradient(60rem 60rem at -10% -10%, " +
-              "rgba(134,168,231,0.18), transparent 60%)," +
+              `${alpha(t.palette.primary.main, 0.18)}, transparent 60%),` +
               "radial-gradient(60rem 60rem at 110% 110%, " +
-              "rgba(250,208,196,0.18), transparent 60%)"
+              `${alpha(t.palette.secondary.main, 0.18)}, transparent 60%)`
           }}
         />
         <CardContent>
@@ -104,8 +156,7 @@ export default function LoginForm({
               textAlign="center"
               sx={{
                 fontWeight: 900,
-                background:
-                  "linear-gradient(90deg, #86A8E7, #91EAE4, #86A8E7)",
+                background: brand,
                 backgroundSize: "200% 100%",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
@@ -121,7 +172,7 @@ export default function LoginForm({
               textAlign="center"
               sx={{ opacity: 0.7, mb: 1 }}
             >
-              Securely connect to your server with a modern, glass UI.
+              Securely connect to your Secure File Transfer Protocol server
             </Typography>
 
             {error && <Alert severity="error">{error}</Alert>}
@@ -162,7 +213,8 @@ export default function LoginForm({
               disabled={loading}
               sx={{
                 py: 1.3,
-                boxShadow: "0 10px 30px rgba(134,168,231,0.35)"
+                boxShadow: (t) =>
+                  `0 10px 30px ${alpha(t.palette.primary.main, 0.35)}`
               }}
             >
               {loading ? (
